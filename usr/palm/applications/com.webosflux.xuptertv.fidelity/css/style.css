@@ -2890,21 +2890,12 @@ div, section, span { outline: none; }
   font-style: italic;
 }
 
-/* Digital clock in top-right of Live TV */
+/* Digital clock in top-right of Live TV removed per user request */
 .player-live-clock {
-  position: absolute;
-  top: 36px;
-  right: 48px;
-  font-size: 34px;
-  font-weight: 600;
-  color: #ffffff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
-  z-index: 50;
-  display: none;
-  pointer-events: none;
+  display: none !important;
 }
 #screen-player:not(.is-mini) .player-live-clock {
-  display: block;
+  display: none !important;
 }
 .is-vod .player-live-clock {
   display: none !important;

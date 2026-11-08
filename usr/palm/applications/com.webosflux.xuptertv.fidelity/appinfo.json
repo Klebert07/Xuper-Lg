@@ -13,7 +13,7 @@
   "spinnerOnLaunch": false,
   "uiRevision": 2,
   "disableBackHistoryAPI": true,
-  "handlesRelaunch": true,
+  "handlesRelaunch": false,
   "requiredACG": [],
   "requiredPermissions": []
 }
