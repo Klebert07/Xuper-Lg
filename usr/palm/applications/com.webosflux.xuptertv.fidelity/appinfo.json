@@ -1,0 +1,19 @@
+{
+  "id": "com.webosflux.xuptertv.fidelity",
+  "version": "1.0.5",
+  "vendor": "webosflux",
+  "type": "web",
+  "main": "index.html",
+  "title": "Xuper WebOS",
+  "icon": "images/icon.png",
+  "largeIcon": "images/icon-large.png",
+  "resolution": "1920x1080",
+  "bgColor": "#e7e7e7",
+  "bgImage": "",
+  "spinnerOnLaunch": false,
+  "uiRevision": 2,
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": true,
+  "requiredACG": [],
+  "requiredPermissions": []
+}
