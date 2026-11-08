@@ -3908,7 +3908,10 @@
       var a = ke.playerItem && ke.playerItem.streamMime || "",
         n = -1 !== e.indexOf(".m3u8") || -1 !== a.indexOf("mpegurl") || !(!ke.playerItem || !ke.playerItem.isHls),
         startMs = startSec > 0 ? Math.round(startSec * 1000) : 0,
-        r = { mediaTransportType: n ? "HLS" : "URI", option: { transmission: { playTime: { start: startMs } } } };
+        r = { mediaTransportType: n ? "HLS" : "URI" };
+      if ("vod" === ke.playerMode && startMs > 0) {
+        r.option = { transmission: { playTime: { start: startMs } } };
+      }
       var o = (n ? "application/vnd.apple.mpegurl" : -1 !== e.indexOf(".mp4") || -1 !== a.indexOf("mp4") ? "video/mp4" : "video/mp2t") + ";mediaOption=" + encodeURI(JSON.stringify(r));
       for (; pe.firstChild;)pe.removeChild(pe.firstChild);
       pe.removeAttribute("src");
@@ -3946,25 +3949,25 @@
     } if (I(e) && !ke.playerEpisode && (!e.episodes || !e.episodes.length) && !e._detailsLoaded) return cn("Cargando capítulos…"), void H(e, function () { i === Za && a() }); a()
   } function fn(e, t, customStartTime) { if (pe) { t && (ke.playerEpisode = t, ke.playerSeasonIndex = ke.detailSeason || 0), e && (ke.playerItem = e); var i = e || ke.playerItem; if (i && ua(i), dn(), i) { if (!Xi) { $i = 0; } ga(i); var startTime = 0; if (typeof customStartTime === "number" && isFinite(customStartTime) && customStartTime > 0) { startTime = customStartTime; } else { var prog = getVodProgress(i.id); if (prog && prog.progress > 10) { if (I(i)) { var epMatch = t && ((prog.episodeId && t.id === prog.episodeId) || (prog.episodeNumber && t.number === prog.episodeNumber)); if (epMatch) startTime = prog.progress; } else { startTime = prog.progress; } } } var isPortal = !0 === i._portal || !0 === i.portal || ("portal" === h.mode && String(i.id || "").length > 15); if (isPortal) { i._portal = !0; var a = t && (t.number || t.seriesNumber) || ""; var loadMsg = a ? "Cargando capítulo " + a + "…" : "Cargando…"; if (startTime > 10) { var mins = Math.floor(startTime / 60), secs = Math.floor(startTime % 60), tStr = (mins > 0 ? (mins + "m ") : "") + secs + "s"; loadMsg += " (Reanudando en " + tStr + ")"; } return cn(loadMsg), void un(i, function (e) { e ? pn(e, startTime) : ke.streamError || cn("Sin fuente de reproducción") }) } i.streamUrl && pn(i.streamUrl, startTime) } } } function vn(e, t) { if ("vod" === ke.playerMode && pe && pe.currentTime > 5 && ke.playerItem) { saveVodProgress(ke.playerItem, ke.playerEpisode, pe.currentTime); } se || Xa(), ke.playerMode = "vod"; var c = t || (e && e.episodes && e.episodes[0]) || ke.playerEpisode || null, p = ke.playerItem && e && (String(ke.playerItem.id) === String(e.id)) && (!c || !ke.playerEpisode || (c.id ? String(c.id) === String(ke.playerEpisode.id) : c.number === ke.playerEpisode.number)), u = p && pe && (pe.currentSrc || pe.src) && !pe.ended; p || va(), e && (ke.playerItem = e), t && (ke.playerEpisode = t), e && ua(e), ke.playerReturn = { screen: "detail", focus: ke.focus }; var i = r("screen-player"), a = r("screen-detail"); i && (i.classList.remove("is-mini"), i.classList.add("is-active")), a && a.classList.remove("is-active"), ke.screen = "player", se.classList.add("is-vod"), bn(), Fe(se), fi(), u ? pe.paused && function () { try { var e = pe.play(); e && e.catch && e.catch(function () { }) } catch (e) { } }() : fn(ke.playerItem, ke.playerEpisode) } function hn(e, t, i) { "vod" !== e || "detail" !== ke.screen ? (se || Xa(), "live" === e && ht(), ke.playerMode = e, t && ke.playerItem !== t && va(), ke.playerItem = t || null, ke.playerEpisode = i || null, "vod" === e && t && ua(t), ke.playerReturn = { screen: ke.screen, focus: ke.focus }, ke.channelsOpen = !1, de.classList.remove("is-active"), ce.classList.remove("is-active"), se.classList.toggle("is-vod", "vod" === e), bn(), ze("player"), Fe(se), bn(), "vod" === e ? (fi(), fn(ke.playerItem, ke.playerEpisode)) : (pi(), yn(z[ke.channel]))) : vn(t, i) } var mn = 0, gn = null; function yn(e, t) {
     if (gn && (clearTimeout(gn), gn = null), e || (e = z[ke.channel]), e && (e.channelCode || e.streamUrl)) {
-      var i = function () {
-        var t = ++mn; cn("Cargando señal " + (e.name || "") + "…"), D("resolveLive", e.streamUrl ? { streamUrl: e.streamUrl } : { channelCode: e.channelCode }, function (e, i) {
+      var doResolve = function () {
+        var t = ++mn; cn("Cargando señal " + (e.name || "") + "…"), D("resolveLive", e.streamUrl ? { streamUrl: e.streamUrl } : { channelCode: e.channelCode }, function (rErr, rRes) {
           if (t === mn) {
-            if (e || !i || !1 === i.returnValue) {
+            if (rErr || !rRes || !1 === rRes.returnValue) {
               if (!z._liveRetries) z._liveRetries = {};
               var chKey = (e && e.channelCode) || ke.channel;
               if (!z._liveRetries[chKey]) z._liveRetries[chKey] = 0;
               if (z._liveRetries[chKey] < 2) {
                 z._liveRetries[chKey]++;
                 cn("Reconectando señal…");
-                return setTimeout(function () { if (t === mn) i(); }, 800);
+                return setTimeout(function () { if (t === mn) doResolve(); }, 800);
               }
               z._liveRetries[chKey] = 0;
-              var userMsg = (e && String(e).length < 60 && !/[\u4e00-\u9fa5]|aaa/i.test(String(e))) ? String(e) : "Señal no disponible por el momento";
+              var userMsg = (rErr && String(rErr).length < 60 && !/[\u4e00-\u9fa5]|aaa/i.test(String(rErr))) ? String(rErr) : "Señal no disponible por el momento";
               return ke.streamError = userMsg, void cn(ke.streamError);
-            } var a = i.proxyPath || i.url; if (!a) return ke.streamError = "Señal no disponible", void cn(ke.streamError); cn(""), pi(), pn(a)
+            } var a = rRes.proxyPath || rRes.url; if (!a) return ke.streamError = "Señal no disponible", void cn(ke.streamError); cn(""), pi(), pn(a)
           }
         })
-      }; t ? i() : gn = setTimeout(i, 180)
+      }; t ? doResolve() : gn = setTimeout(doResolve, 180)
     }
   }
   var _piButtons = [];
