@@ -721,8 +721,8 @@
     var tipos = ["Pelicula", "Series", "Kids", "Anime"];
     var generos = ["Todos", "Acción", "Drama", "Aventuras", "Crimen", "Ciencia ficción", "Diseño", "Comedia", "Romántico", "Animación", "Familiar", "Suspenso", "Terror", "Fantasía", "Historia", "Biografía", "Documental", "Western", "Guerra", "Deportes", "Música"];
     var years = ["Todos", "2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018", "2017", "2016", "2015"];
-    var countries = ["Todos", "Brasil", "Portugal", "Estados Unidos", "México", "Reino Unido", "Japón", "Corea del Sur", "España", "Colombia", "Argentina"];
-    var audios = ["Todos", "Portugués", "Español", "Inglés"];
+    var countries = ["Todos", "México", "España", "Colombia", "Argentina", "Estados Unidos", "Brasil", "Portugal", "Reino Unido", "Japón", "Corea del Sur"];
+    var audios = ["Todos", "Español", "Portugués", "Inglés"];
 
     var rowElements = [[], [], [], [], []];
 
@@ -1081,11 +1081,17 @@
     var elem = s(e, ".cell") || s(e, ".search-cell") || e;
     for (var t = s(e, ".scrollable"); t;) {
       var i = elem.getBoundingClientRect(), a = t.getBoundingClientRect();
-      var isHorizOnly = t.classList.contains("poster-row") || t.classList.contains("detail-grid") || t.classList.contains("detail-episodes") || t.classList.contains("pc-categories");
+      var isHorizOnly = t.classList.contains("poster-row") || t.classList.contains("detail-grid") || t.classList.contains("detail-episodes");
       if (!isHorizOnly && t.scrollHeight > t.clientHeight + 1) {
-        i.top < a.top ? t.scrollTop = Math.max(0, t.scrollTop - (a.top - i.top + 35)) : i.bottom > a.bottom && (t.scrollTop += i.bottom - a.bottom + 35);
+        if (elem._idx === 0 || elem._channel === 0) {
+          t.scrollTop = 0;
+        } else if (i.top < a.top) {
+          t.scrollTop = Math.max(0, t.scrollTop - (a.top - i.top + 45));
+        } else if (i.bottom > a.bottom) {
+          t.scrollTop += (i.bottom - a.bottom + 45);
+        }
       }
-      var isVertOnly = t.classList.contains("home-page") || t.classList.contains("search-grid") || t.classList.contains("home-tabs") || t.classList.contains("player-channels") || t.classList.contains("live-list") || t.classList.contains("settings-menu");
+      var isVertOnly = t.classList.contains("home-page") || t.classList.contains("search-grid") || t.classList.contains("home-tabs") || t.classList.contains("player-channels") || t.classList.contains("live-list") || t.classList.contains("settings-menu") || t.classList.contains("pc-categories") || t.classList.contains("pc-list") || t.classList.contains("pc-search-results");
       if (!isVertOnly && t.scrollWidth > t.clientWidth + 1) {
         if (i.left < a.left) {
           if (elem._posterIdx === 0) {
@@ -1447,11 +1453,22 @@
     var shelves = rawShelves.slice().sort(function (a, b) { return shelfScore(b) - shelfScore(a); });
     var allItems = rootObj.items || [];
     var candidates = [];
-    var seen = {};
+    var seenIds = {};
+    var seenImages = {};
+    var seenTitles = {};
 
     function addCandidate(it) {
-      if (!it || !it.id || seen[it.id]) return;
-      seen[it.id] = true;
+      if (!it || !it.id) return;
+      var idStr = String(it.id);
+      if (seenIds[idStr]) return;
+      var img = it.landscape || it.backdrop || it.poster || "";
+      if (img && seenImages[img]) return;
+      var fTitle = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it.title || "") : String(it.title || "")).toLowerCase().trim();
+      if (fTitle && fTitle.length >= 3 && seenTitles[fTitle]) return;
+
+      seenIds[idStr] = true;
+      if (img) seenImages[img] = true;
+      if (fTitle && fTitle.length >= 3) seenTitles[fTitle] = true;
       candidates.push(it);
     }
 
@@ -1540,14 +1557,13 @@
 
   function updateBentoItems(containerEl, items, options) {
     if (!containerEl || !items || !items.length) return;
+    if (containerEl._setBentoItems) {
+      containerEl._setBentoItems(items);
+      return;
+    }
     var bentos = containerEl.querySelectorAll(".bento");
-    if (!bentos || bentos.length < 6) return;
-    options = options || {};
-    for (var i = 0; i < 6; i++) {
-      var it = items[i % items.length];
-      if (it && bentos[i]) {
-        updateSingleBentoBox(bentos[i], it);
-      }
+    if (bentos && bentos.length && items[0]) {
+      updateSingleBentoBox(bentos[0], items[0]);
     }
   }
 
@@ -1615,47 +1631,147 @@
     });
   }
 
+  function getSportsChannelLogo(name) {
+    if (!name) return "";
+    var n = String(name).toLowerCase();
+    if (/espn/i.test(n)) return "assets/original/home/logos/espn.png";
+    if (/tnt/i.test(n)) return "assets/original/home/logos/tnt_sports.png";
+    return "";
+  }
+
+  function getChannelLogo(ch) {
+    if (!ch) return "assets/original/home/live_channel_default_icon.png";
+    var logo = ch.logo;
+    if (logo && !/live_channel_default_icon\.png$/i.test(logo)) return logo;
+    var sportsLogo = getSportsChannelLogo(ch.name || ch.alias || "");
+    if (sportsLogo) return sportsLogo;
+    return logo || "assets/original/home/live_channel_default_icon.png";
+  }
+
   var _customSportsChannels = [
-    { id: 9001, channelCode: "espn_n_1", name: "ESPN (N)", streamUrl: "http://190.60.52.28:5001/play/a0d7/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9002, channelCode: "espn_2_n1", name: "ESPN 2 (N1)", streamUrl: "http://190.60.52.28:5001/play/a0f5/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9003, channelCode: "espn_2_n2", name: "ESPN 2 (N2)", streamUrl: "http://190.60.52.28:5001/play/a0d6/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9004, channelCode: "espn_2_n3", name: "ESPN 2 (N3)", streamUrl: "http://190.60.52.28:5001/play/a0c6/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9005, channelCode: "espn_2_hd_n2", name: "ESPN 2 HD (N2)", streamUrl: "http://190.60.52.28:5001/play/a09t/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9006, channelCode: "espn_3_n", name: "ESPN 3 (N)", streamUrl: "http://190.60.52.28:5001/play/a0cl/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9007, channelCode: "espn_3_hd_n2", name: "ESPN 3 HD (N2)", streamUrl: "http://190.60.52.28:5001/play/a094/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9008, channelCode: "espn_4_hd_n", name: "ESPN 4HD (N)", streamUrl: "http://190.60.52.28:5001/play/a0as/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9009, channelCode: "espn_5_n", name: "ESPN 5 (N)", streamUrl: "http://190.60.52.28:5001/play/a0dn/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9010, channelCode: "espn_5_hd_n2", name: "ESPN 5HD (N2)", streamUrl: "http://190.60.52.28:5001/play/a09q/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9011, channelCode: "espn_6_n", name: "ESPN 6 (N)", streamUrl: "http://190.60.52.28:5001/play/a0de/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9012, channelCode: "espn_6_hd_n2", name: "ESPN 6HD (N2)", streamUrl: "http://190.60.52.28:5001/play/a095/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9013, channelCode: "espn_7_n", name: "ESPN 7 (N)", streamUrl: "http://190.60.52.28:5001/play/a0dd/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9014, channelCode: "espn_7_hd_n2", name: "ESPN 7HD (N2)", streamUrl: "http://190.60.52.28:5001/play/a0ak/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9015, channelCode: "espn_hd_n", name: "ESPN HD (N)", streamUrl: "http://190.60.52.28:5001/play/a0ar/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9016, channelCode: "espn_prem_hd_n1", name: "ESPN Premium HD (N1)", streamUrl: "http://190.60.52.28:5001/play/a09d/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9017, channelCode: "espn_prem_hd_n", name: "ESPN Premium HD (N)", streamUrl: "http://190.60.52.28:5001/play/a0fz/index.m3u8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9018, channelCode: "espn_alt_1", name: "ESPN", streamUrl: "http://181.78.79.131:8000/play/a0s7", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9019, channelCode: "espn_2_hd_alt", name: "ESPN 2 HD", streamUrl: "http://181.78.79.131:8000/play/a0qj", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9020, channelCode: "espn_3_hd_alt", name: "ESPN 3 HD", streamUrl: "http://181.78.79.131:8000/play/a0s6", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9021, channelCode: "espn_4_hd_alt", name: "ESPN 4 HD", streamUrl: "http://181.78.79.131:8000/play/a0s9", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9022, channelCode: "espn_5_hd_alt", name: "ESPN 5 HD", streamUrl: "http://181.78.79.131:8000/play/a0s5", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9023, channelCode: "espn_6_hd_alt", name: "ESPN 6 HD", streamUrl: "http://181.78.79.131:8000/play/a0s3", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9024, channelCode: "espn_7_hd_alt", name: "ESPN 7 HD", streamUrl: "http://181.78.79.131:8000/play/a0s8", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9025, channelCode: "espn_prem_alt", name: "Espn Premium", streamUrl: "http://181.78.79.131:8000/play/a0r2", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true },
-    { id: 9026, channelCode: "gol_tv", name: "GOL TV", streamUrl: "http://181.78.79.131:8000/play/a0t0", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: false },
-    { id: 9027, channelCode: "l1_max", name: "L1 MAX", streamUrl: "http://181.78.79.131:8000/play/a0ql", logo: "assets/original/home/live_channel_default_icon.png", category: "Deportes", categoryId: 76206, now: "En vivo", time: "24/7", uhd: true }
-  ];
+  {
+    "id": 9001,
+    "channelCode": "espn_1",
+    "name": "ESPN",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s7",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": false
+  },
+  {
+    "id": 9002,
+    "channelCode": "espn_2_hd",
+    "name": "ESPN 2 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0qj",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9003,
+    "channelCode": "espn_3_hd",
+    "name": "ESPN 3 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s6",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9004,
+    "channelCode": "espn_4_hd",
+    "name": "ESPN 4 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s9",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9005,
+    "channelCode": "espn_5_hd",
+    "name": "ESPN 5 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s5",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9006,
+    "channelCode": "espn_6_hd",
+    "name": "ESPN 6 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s3",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9007,
+    "channelCode": "espn_7_hd",
+    "name": "ESPN 7 HD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0s8",
+    "logo": "assets/original/home/logos/espn.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": true
+  },
+  {
+    "id": 9008,
+    "channelCode": "tnt_sports",
+    "name": "TNT SPORTS",
+    "streamUrl": "http://181.78.79.131:8000/play/a0mo",
+    "logo": "assets/original/home/logos/tnt_sports.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": false
+  },
+  {
+    "id": 9009,
+    "channelCode": "tnt_sports_premium",
+    "name": "TNT Sports Premium SD",
+    "streamUrl": "http://181.78.79.131:8000/play/a0q9",
+    "logo": "assets/original/home/logos/tnt_sports.png",
+    "category": "Deportes",
+    "categoryId": 76206,
+    "now": "En vivo",
+    "time": "24/7",
+    "uhd": false
+  }
+];
 
   function _mergeCustomSportsChannels(apiList) {
     var list = (apiList && apiList.slice()) || [];
     var custom = _customSportsChannels.map(function (c, i) {
       var item = {};
       for (var k in c) if (c.hasOwnProperty(k)) item[k] = c[k];
+      item.logo = getChannelLogo(item);
       item.index = i + 1;
       return item;
     });
     var seenUrls = {};
     for (var i = 0; i < list.length; i++) {
       if (list[i].streamUrl) seenUrls[list[i].streamUrl] = true;
+      list[i].logo = getChannelLogo(list[i]);
     }
     var added = [];
     for (var j = 0; j < custom.length; j++) {
@@ -1666,6 +1782,7 @@
     var res = added.concat(list);
     for (var idx = 0; idx < res.length; idx++) {
       res[idx].index = idx + 1;
+      res[idx].logo = getChannelLogo(res[idx]);
     }
     return res;
   }
@@ -1712,15 +1829,34 @@
     syncMagisRoot("anime", 5, e);
   }, function (e) {
     var sportItems = [];
+    var sportKeywords = /\b(sport|deport|futbol|soccer|box|boxing|nba|f1|formula|racing|carreras|velocidad|ufc|wwe|atlet|olimp|speed|extreme|runner|maraton|lucha)\b/i;
+    var seenSport = {};
     for (var i = 0; i < u.length; i++) {
       var it = u[i];
-      var g = (it.genres || []).map(function (x) { return String(x).toLowerCase(); });
-      if (g.indexOf("sport") !== -1 || g.indexOf("deportes") !== -1 || g.indexOf("deporte") !== -1 || (it.category && String(it.category).toLowerCase().indexOf("deport") !== -1)) {
-        sportItems.push(it);
+      var g = (it.genres || []).map(function (x) { return String(x).toLowerCase(); }).join(" ");
+      var cat = String(it.category || "").toLowerCase();
+      var title = String(it.title || "").toLowerCase();
+      if (sportKeywords.test(g) || sportKeywords.test(cat) || sportKeywords.test(title)) {
+        var fr = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it.title || "") : title).toLowerCase().trim();
+        var img = it.landscape || it.backdrop || it.poster || "";
+        if (!seenSport[it.id] && (!img || !seenSport[img]) && (!fr || !seenSport[fr])) {
+          seenSport[it.id] = true;
+          if (img) seenSport[img] = true;
+          if (fr) seenSport[fr] = true;
+          sportItems.push(it);
+        }
       }
     }
-    if (!sportItems.length) {
-      sportItems = u.slice(0, 12);
+    for (var j = 0; j < u.length && sportItems.length < 15; j++) {
+      var it2 = u[j];
+      var fr2 = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it2.title || "") : String(it2.title || "")).toLowerCase().trim();
+      var img2 = it2.landscape || it2.backdrop || it2.poster || "";
+      if (!seenSport[it2.id] && (!img2 || !seenSport[img2]) && (!fr2 || !seenSport[fr2])) {
+        seenSport[it2.id] = true;
+        if (img2) seenSport[img2] = true;
+        if (fr2) seenSport[fr2] = true;
+        sportItems.push(it2);
+      }
     }
     Mt(e, sportItems, { titles: !0, dots: 3, shade: !0 });
 
@@ -1738,9 +1874,10 @@
         (function (ch, idx) {
           var card = n("div", "poster focusable");
           l(card, 216 * idx, 0, 192, 288);
+          var defIcon = getChannelLogo(ch);
           var img = n("img", "p-img");
-          img.src = ch.logo || "assets/original/home/live_channel_default_icon.png";
-          img.onerror = function () { this.src = "assets/original/home/live_channel_default_icon.png"; };
+          img.src = (ch.logo && !/live_channel_default_icon\.png$/i.test(ch.logo)) ? ch.logo : defIcon;
+          img.onerror = function () { this.src = defIcon; };
           card.appendChild(img);
           card.appendChild(n("div", "p-shade"));
           card.appendChild(n("div", "p-title", ch.name));
@@ -1939,7 +2076,7 @@
         });
       }(), t && t(i, a);
     });
-  } function Ct(e) { if (Q) { o(Q), Me = []; for (var t = 0; t < z.length; t++)if ((ke.crOn || !isAdultContent(z[t])) && (!e || z[t].fav)) { var i = n("div", "live-row focusable"); i._channel = t; var a = n("div", "row-icon"); z[t].logo && (a.style.backgroundImage = "url(" + z[t].logo + ")", a.style.backgroundSize = "contain", a.style.backgroundRepeat = "no-repeat", a.style.backgroundPosition = "center"); var r = n("div", "row-play"), l = n("div", "row-name", z[t].name); i.appendChild(a), i.appendChild(r), i.appendChild(l), t === ke.channel && i.classList.add("is-current"), i._activate = function (e) { return function () { St(e, !0), hn("live") } }(t), i._onMove = function (e) { return function (t) { return "left" === t ? (X ? Fe(X) : Ee[0] && Fe(Ee[0]), !0) : "up" === t ? (e > 0 && Me[e - 1] ? Fe(Me[e - 1]) : (function () { var rec = j ? j.querySelector(".rec") || j.querySelector(".notify-item") : null; rec && Fe(rec); })(), !0) : "down" === t && (e < Me.length - 1 && Me[e + 1] && Fe(Me[e + 1]), !0) } }(t), Q.appendChild(i), Me.push(i) } z[ke.channel] && W && (W.textContent = z[ke.channel].name), wt() } } var _prevLiveIdx = -1; function wt() { if (Me.length && Q) { var e = ke.channel; var t = 120 * e, i = Math.max(0, Q.scrollHeight - Q.clientHeight), a = Q.scrollTop; t < a && (a = t), t + 100.5 > a + Q.clientHeight && (a = t + 100.5 - Q.clientHeight), Q.scrollTop = Math.max(0, Math.min(i, a)) } } function St(e, t) { e < 0 && (e = 0), e > z.length - 1 && (e = z.length - 1); var prev = _prevLiveIdx >= 0 ? _prevLiveIdx : ke.channel; if (ke.channel !== e && ke.channel >= 0) { _lastWatchedLiveChannel = ke.channel; } ke.channel = e, _prevLiveIdx = e; if (Me[prev] && prev !== e) Me[prev].classList.remove("is-current"); if (Me[e]) Me[e].classList.add("is-current"); z[e] && W && (W.textContent = z[e].name), wt(), "player" === ke.screen ? (!function () { if (!se) return; bn() }(), "live" === ke.playerMode && yn(z[e], !!t)) : "home" === ke.screen && 0 === ke.tab && mt(z[e]) }
+  } function Ct(e) { if (Q) { o(Q), Me = []; for (var t = 0; t < z.length; t++)if ((ke.crOn || !isAdultContent(z[t])) && (!e || z[t].fav)) { var i = n("div", "live-row focusable"); i._channel = t; var a = n("div", "row-icon"); var tLogo = (z[t] && getChannelLogo(z[t])) || ""; tLogo && (a.style.backgroundImage = "url(" + tLogo + ")", a.style.backgroundSize = "contain", a.style.backgroundRepeat = "no-repeat", a.style.backgroundPosition = "center"); var r = n("div", "row-play"), l = n("div", "row-name", z[t].name); i.appendChild(a), i.appendChild(r), i.appendChild(l), t === ke.channel && i.classList.add("is-current"), i._activate = function (e) { return function () { St(e, !0), hn("live") } }(t), i._onMove = function (e) { return function (t) { return "left" === t ? (X ? Fe(X) : Ee[0] && Fe(Ee[0]), !0) : "up" === t ? (e > 0 && Me[e - 1] ? Fe(Me[e - 1]) : (function () { var rec = j ? j.querySelector(".rec") || j.querySelector(".notify-item") : null; rec && Fe(rec); })(), !0) : "down" === t && (e < Me.length - 1 && Me[e + 1] && Fe(Me[e + 1]), !0) } }(t), Q.appendChild(i), Me.push(i) } z[ke.channel] && W && (W.textContent = z[ke.channel].name), wt() } } var _prevLiveIdx = -1; function wt() { if (Me.length && Q) { var e = ke.channel; var t = 120 * e, i = Math.max(0, Q.scrollHeight - Q.clientHeight), a = Q.scrollTop; t < a && (a = t), t + 100.5 > a + Q.clientHeight && (a = t + 100.5 - Q.clientHeight), Q.scrollTop = Math.max(0, Math.min(i, a)) } } function St(e, t) { e < 0 && (e = 0), e > z.length - 1 && (e = z.length - 1); var prev = _prevLiveIdx >= 0 ? _prevLiveIdx : ke.channel; if (ke.channel !== e && ke.channel >= 0) { _lastWatchedLiveChannel = ke.channel; } ke.channel = e, _prevLiveIdx = e; if (Me[prev] && prev !== e) Me[prev].classList.remove("is-current"); if (Me[e]) Me[e].classList.add("is-current"); z[e] && W && (W.textContent = z[e].name), wt(), "player" === ke.screen ? (!function () { if (!se) return; bn() }(), "live" === ke.playerMode && yn(z[e], !!t)) : "home" === ke.screen && 0 === ke.tab && mt(z[e]) }
   var It = { bigW: 831, bigH: 534, bigY: 38.5, smallW: 413, smallH: 222, smallY: 578.5, bigX: [192, 1029], smallX: [192, 609, 1028, 1446] };
   function Tt(e, t, i, a, r, o) {
     o = o || {};
@@ -1989,14 +2126,52 @@
       clearInterval(e._bentoTimer);
       e._bentoTimer = null;
     }
-    var totalItems = a;
     var heroCount = Math.min(5, Math.max(2, i.dots || 4));
-    if (totalItems.length <= heroCount) {
-      heroCount = Math.max(1, totalItems.length);
+    var usedIds = {};
+    var usedImages = {};
+    var usedTitles = {};
+
+    function canUseItem(it) {
+      if (!it || !it.id) return false;
+      var idStr = String(it.id);
+      if (usedIds[idStr]) return false;
+      var img = it.landscape || it.backdrop || it.poster || "";
+      if (img && usedImages[img]) return false;
+      var fTitle = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it.title || "") : String(it.title || "")).toLowerCase().trim();
+      if (fTitle && fTitle.length >= 3 && usedTitles[fTitle]) return false;
+      return true;
     }
-    var heroList = totalItems.slice(0, heroCount);
-    for (var hi = 0; hi < heroList.length; hi++) {
-      var hItem = heroList[hi];
+
+    function markUsed(it) {
+      if (!it || !it.id) return;
+      usedIds[String(it.id)] = true;
+      var img = it.landscape || it.backdrop || it.poster || "";
+      if (img) usedImages[img] = true;
+      var fTitle = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it.title || "") : String(it.title || "")).toLowerCase().trim();
+      if (fTitle && fTitle.length >= 3) usedTitles[fTitle] = true;
+    }
+
+    // 1. Select heroList (ONLY for Box 0 carousel - rotates through slides)
+    var heroList = [];
+    for (var hi = 0; hi < a.length && heroList.length < heroCount; hi++) {
+      if (canUseItem(a[hi])) {
+        markUsed(a[hi]);
+        heroList.push(a[hi]);
+      }
+    }
+    if (heroList.length < heroCount && Array.isArray(u)) {
+      for (var hi2 = 0; hi2 < u.length && heroList.length < heroCount; hi2++) {
+        if (canUseItem(u[hi2])) {
+          markUsed(u[hi2]);
+          heroList.push(u[hi2]);
+        }
+      }
+    }
+    if (!heroList.length) heroList = a.slice(0, 1);
+
+    // Preload hero images
+    for (var phi = 0; phi < heroList.length; phi++) {
+      var hItem = heroList[phi];
       var hUrl = hItem ? (hItem.landscape || hItem.backdrop || hItem.poster) : "";
       if (hUrl) {
         var hPre = new Image();
@@ -2005,13 +2180,26 @@
         hPre.src = hUrl;
       }
     }
+
+    // 2. Select staticList (Boxes 1..5 - NEVER rotate, NEVER change image, STRICTLY disjoint from heroList)
+    var staticList = [];
+    for (var si = 0; si < a.length && staticList.length < 5; si++) {
+      if (canUseItem(a[si])) {
+        markUsed(a[si]);
+        staticList.push(a[si]);
+      }
+    }
+    if (staticList.length < 5 && Array.isArray(u)) {
+      for (var si2 = 0; si2 < u.length && staticList.length < 5; si2++) {
+        if (canUseItem(u[si2])) {
+          markUsed(u[si2]);
+          staticList.push(u[si2]);
+        }
+      }
+    }
+
     var numPages = heroList.length;
     var curPage = 0;
-    var staticList = [];
-    var sIdx = heroCount;
-    for (var si = 0; si < 5; si++) {
-      staticList.push(totalItems[(sIdx + si) % totalItems.length]);
-    }
     var bList = [];
 
     // Big Card 0: Dynamic Carousel Hero (rotates)
@@ -2021,14 +2209,14 @@
     e.appendChild(bHero);
     bList.push(bHero);
 
-    // Big Card 1: Static category highlight
+    // Big Card 1: Static category highlight (NEVER CHANGES)
     var bBigStatic = Tt(staticList[0], It.bigX[1], It.bigY, It.bigW, It.bigH, { shade: !0, title: !0 });
     bBigStatic._bentoIdx = 1;
     bBigStatic._bentoContainer = e;
     e.appendChild(bBigStatic);
     bList.push(bBigStatic);
 
-    // Small Cards 2..5: 4 Static category tiles
+    // Small Cards 2..5: 4 Static category tiles (NEVER CHANGE)
     for (var n = 0; n < 4; n++) {
       var bSm = Tt(staticList[n + 1], It.smallX[n], It.smallY, It.smallW, It.smallH, { shade: !0, title: !0 });
       bSm._bentoIdx = n + 2;
@@ -2069,16 +2257,8 @@
           allDots[d].classList.toggle("is-active", d === curPage);
         }
       }
-      // Update ONLY the first big box (Hero)
+      // Update ONLY the first big box (Hero) - Boxes 1..5 are static and never change
       updateSingleBentoBox(bList[0], heroList[curPage]);
-    }
-
-    function isFocusInBento() {
-      if (!ke.focus || ke.screen !== "home") return !1;
-      for (var b = 0; b < bList.length; b++) {
-        if (bList[b] === ke.focus || (bList[b].contains && bList[b].contains(ke.focus))) return !0;
-      }
-      return !1;
     }
 
     function resetBentoTimer() {
@@ -2090,7 +2270,6 @@
         e._bentoTimer = setInterval(function () {
           if (ke.screen !== "home") return;
           if (!e.classList.contains("is-current")) return;
-          if (!isFocusInBento()) return;
           setCarouselPage(curPage + 1);
         }, 4500);
       }
@@ -2152,25 +2331,37 @@
     }
 
     e._setBentoItems = function (newItems) {
-      if (newItems && newItems.length) {
-        totalItems = newItems;
-        heroCount = Math.min(5, Math.max(2, i.dots || 4));
-        if (totalItems.length <= heroCount) {
-          heroCount = Math.max(1, totalItems.length);
+      if (!newItems || !newItems.length) return;
+      // Per user explicit instruction: SOLO EL PRINCIPAL (box 0) se cambia la imagen!
+      // Boxes 1..5 remain static. We only refresh hero carousel slides with new fresh items that do NOT collide with Boxes 1..5.
+      var heroUsed = {};
+      for (var sb = 1; sb < bList.length; sb++) {
+        var sItem = bList[sb] && bList[sb]._item;
+        if (sItem && sItem.id) {
+          heroUsed[String(sItem.id)] = true;
+          var sImg = sItem.landscape || sItem.backdrop || sItem.poster || "";
+          if (sImg) heroUsed[sImg] = true;
+          var sFr = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(sItem.title || "") : String(sItem.title || "")).toLowerCase().trim();
+          if (sFr && sFr.length >= 3) heroUsed[sFr] = true;
         }
-        heroList = totalItems.slice(0, heroCount);
+      }
+      var newHeroList = [];
+      for (var ni = 0; ni < newItems.length && newHeroList.length < heroCount; ni++) {
+        var it = newItems[ni];
+        var idStr = String(it.id);
+        var img = it.landscape || it.backdrop || it.poster || "";
+        var fTitle = (typeof extractFranchiseRoot === "function" ? extractFranchiseRoot(it.title || "") : String(it.title || "")).toLowerCase().trim();
+        if (!heroUsed[idStr] && (!img || !heroUsed[img]) && (!fTitle || !heroUsed[fTitle])) {
+          heroUsed[idStr] = true;
+          if (img) heroUsed[img] = true;
+          if (fTitle && fTitle.length >= 3) heroUsed[fTitle] = true;
+          newHeroList.push(it);
+        }
+      }
+      if (newHeroList.length) {
+        heroList = newHeroList;
         numPages = heroList.length;
         curPage = curPage % numPages;
-        staticList = [];
-        var sIdx = heroCount;
-        for (var si = 0; si < 5; si++) {
-          staticList.push(totalItems[(sIdx + si) % totalItems.length]);
-        }
-        for (var sb = 1; sb < 6; sb++) {
-          if (bList[sb] && staticList[sb - 1]) {
-            updateSingleBentoBox(bList[sb], staticList[sb - 1]);
-          }
-        }
         updateDots();
         setCarouselPage(curPage);
         resetBentoTimer();
@@ -2511,7 +2702,7 @@
       var card = n("div", "sp-card");
       l(card, 30, 198, 1360, 250);
       card.appendChild(n("h3", null, "Versión de la aplicación"));
-      var ver = n("div", "sp-version", "v1.0.5 - Sistema actualizado");
+      var ver = n("div", "sp-version", "v1.0.6 - Sistema actualizado");
       card.appendChild(ver);
       e.appendChild(card);
       return e;
@@ -2591,7 +2782,7 @@
     if ("player" === ke.screen && !ke.channelsOpen && se) {
       Fe(se, !0);
     }
-  } function fi() { pi() } function vi() { ui() } var hi = null, mi = null, gi = null, yi = null, bi = null, Ci = null, wi = null, Si = null, xi = null, _i = null, Li = null, ki = null, Ii = null, Ti = null, Ei = null, Mi = null, qi = null, Oi = null, Ai = null, Di = null, Pi = null, Ni = null, Ri = null, Ui = null, Fi = null, Bi = null, Hi = null, zi = null, Vi = !1, ji = !1, Wi = null, $i = 0, Xi = !1, Qi = null, Gi = !1, Ji = !1, Ki = 0, Yi = "normal", Zi = "white", ea = "contain", ta = [], ia = {}, aa = {}, na = null; function ra(e) { if (!e) return 0; var t = e.replace(",", ".").split(":"); return 3 === t.length ? 3600 * parseFloat(t[0]) + 60 * parseFloat(t[1]) + parseFloat(t[2]) : 0 } function oa(e) { var t = ++Ki; if (!e || !e.url) return ta = [], void (zi && (zi.innerHTML = "")); try { var i = new XMLHttpRequest; i.open("GET", e.url, !0), i.onload = function () { t === Ki && i.status >= 200 && i.status < 300 && (ta = function (e) { var t = []; if (!e) return t; for (var i = e.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n\n"), a = 0; a < i.length; a++) { var n = i[a].trim().split("\n"); if (n.length >= 2) { var r = -1 !== n[0].indexOf("--\x3e") ? n[0] : n[1], o = -1 !== n[0].indexOf("--\x3e") ? n.slice(1) : n.slice(2); if (r && -1 !== r.indexOf("--\x3e")) { var l = r.split("--\x3e"), s = ra(l[0].trim()), d = ra(l[1].trim()), c = o.join("<br>").replace(/<font[^>]*>/gi, "").replace(/<\/font>/gi, "").trim(); c && t.push({ start: s, end: d, text: c }) } } } return t }(i.responseText)) }, i.send() } catch (e) { } } function la() { zi && (zi.classList.remove("size-small", "size-normal", "size-big"), zi.classList.add("size-" + Yi), zi.classList.remove("color-white", "color-yellow", "color-black"), zi.classList.add("color-" + Zi)) } function sa(e) { if (zi) if (Gi && ta && ta.length) { for (var t = null, i = 0; i < ta.length; i++)if (e >= ta[i].start && e <= ta[i].end) { t = ta[i]; break } if (t) { var a = '<span class="player-subtitles-text">' + t.text + "</span>"; zi.innerHTML !== a && (zi.innerHTML = a) } else "" !== zi.innerHTML && (zi.innerHTML = "") } else "" !== zi.innerHTML && (zi.innerHTML = "") } function da() { return "detail" === ke.screen ? ke.detail || null : ke.playerItem || ke.detail || null } var ca = {}; function pa(e) { return e && (e.seriesId || e.id) || "" } function ua(e) { var t = pa(e); ke.streamMode = ca[t] ? "smooth" : "normal" } function fa(e, t) { var i = pa(e); ke.streamMode = t ? "smooth" : "normal", i && (ca[i] = !!t) } function va() { $i = 0, Xi = !1, Qi = null, Gi = !1, Ji = !1, Ki++, ke.trackIndex = 0, ta = [], zi && (zi.innerHTML = "") } function ha(e) { return e && I(e) ? "player" === ke.screen && ke.playerEpisode ? ke.playerEpisode : ke.detailEpisode ? ke.detailEpisode : e.episodes && e.episodes[0] || null : null } function ma(e) { if (!e) return ""; var t = ha(e); return t && t.id ? t.id : e.id || "" } function ga(e, t) { if (t = t || function () { }, !e) return t(null); var i = ma(e); if (!i) return t(null); if (ia[i]) return Ca(ia[i]), t(ia[i]); if (aa[i]) aa[i].push(t); else { aa[i] = [t]; var a = ha(e), n = { contentId: i }, r = e.seasonId || e.id; a && a.id && r && a.id !== r && (n.seriesContentId = r), D("mediaInfo", n, function (e, t) { var a = aa[i] || []; delete aa[i]; var n = !e && t && !1 !== t.returnValue ? t : null; n && (ia[i] = n, Ca(n)); for (var r = 0; r < a.length; r++)try { a[r](n) } catch (e) { } }) } } function ya(e) { if (!e) return 0; var t = (e || "").split(/[\/,]/), bestIdx = 0, bestScore = -1; for (var i = 0; i < t.length; i++) { var raw = t[i].trim().toLowerCase(), score = 0; if (/^(lat|latino|la|spa_lat|es[-_]?419|es[-_]?la)$/i.test(raw)) { score = 100; } else if (/^(spa|esp|es)$/i.test(raw)) { score = 90; } else if (/^(cast|castellano|spa_es|es[-_]?es)$/i.test(raw)) { score = 80; } else if (/^(eng|en|ing|ingles)$/i.test(raw)) { score = 50; } else if (/^(por|pt|portugues)$/i.test(raw)) { score = 40; } if (score > bestScore) { bestScore = score; bestIdx = i; } } return bestIdx; } function ba(e) { for (var t = [], i = e && e.subtitles || [], a = 0; a < i.length; a++)t.push({ lang: i[a].lang, url: i[a].url, format: i[a].format }); return t.sort(function (e, t) { return (/^(es|spa|esp)$/i.test(e.lang || "") ? 0 : 1) - (/^(es|spa|esp)$/i.test(t.lang || "") ? 0 : 1) }), t } function Ca(e) { var t = ba(e); if (!Ji) return t.length ? (Gi = !0, void oa(Qi = t[0])) : (Gi = !1, Qi = null, void oa(null)); if (Gi) { if (!t.length) return Gi = !1, Qi = null, void oa(null); var i = !1; if (Qi) for (var a = 0; a < t.length; a++)if (t[a].url === Qi.url) { Qi = t[a], i = !0; break } i || oa(Qi = t[0]) } } function wa() { Wi && clearTimeout(Wi), Wi = setTimeout(function () { xa() }, 8e3) } function Sa() { (hi || Xa(), hi) && (Vi = !0, ji = !1, ui(), _a(), hi.classList.add("is-active"), zi && zi.classList.add("shift-up"), ga(ke.playerItem, function () { Vi && _a() }), wa(), I(ke.playerItem) && Li ? Fe(Li) : bi && Fe(bi)) } function xa() { Wi && (clearTimeout(Wi), Wi = null), Vi = !1, hi && hi.classList.remove("is-active"), zi && zi.classList.remove("shift-up"), _lastBackTime = Date.now(), Ve = Date.now() + 500, "player" !== ke.screen || ji || Fe(se) } function _a() { var e = ke.focus ? s(ke.focus, ".psv-row") : null, t = e ? e.id : "", i = e && ke.focus ? ke.focus.textContent : ""; if (ka(), updatePsvAudio(), Ra(), Ua(), La(), Vi && t && hi) for (var a = hi.querySelectorAll(".psv-row"), n = 0; n < a.length; n++)if (a[n].id === t) { for (var r = a[n].querySelectorAll(".focusable"), o = null, l = 0; l < r.length; l++)if (r[l].textContent === i) { o = r[l]; break } var d = o || Be(a[n]); d && Fe(d, !0); break } } function La() { if (hi) { for (var e = hi.querySelectorAll(".psv-row"), t = 0; t < e.length; t++)e[t].classList.remove("is-row-focused"); var i = ke.focus ? s(ke.focus, ".psv-row") : null; i && i.classList.add("is-row-focused") } } function ka() { if (gi) { var e = ke.playerItem; if (e && I(e)) { if (gi.style.display = "block", yi) { o(yi); var t = Ia(e), i = t[ke.playerSeasonIndex] || t[0], a = i && i.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? e.episodes : i && i._episodes || e.episodes || []; if (a.length) { for (var r = 0, l = 0; l < a.length; l++)if (ke.playerEpisode && (a[l].id === ke.playerEpisode.id || a[l].number === ke.playerEpisode.number)) { r = l; break } var s = Nt(a.length); (void 0 === ke.playerEpisodeRange || ke.playerEpisodeRange >= s.length) && (ke.playerEpisodeRange = Math.floor(r / 20)); for (var d = s[ke.playerEpisodeRange] || s[0], c = n("div", "psv-episode-numbers"), p = d.start; p < d.end; p++)(function (e, t) { var i = String(void 0 !== e.number && null !== e.number ? e.number : t + 1), a = n("button", "psv-ep-btn focusable" + (t === r ? " is-selected" : ""), i); a._activate = function () { Da(e) }, c.appendChild(a) })(a[p], p); yi.appendChild(c); for (var u = n("div", "psv-episode-ranges"), f = 0; f < s.length; f++)(function (e, t) { var i = n("button", "psv-range-btn focusable" + (e === ke.playerEpisodeRange ? " is-selected" : ""), t.start + 1 + "-" + t.end); i._activate = function () { ke.playerEpisodeRange = e, ka(); var t = yi.querySelector(".psv-ep-btn"); t && Fe(t) }, u.appendChild(i) })(f, s[f]); yi.appendChild(u) } else yi.appendChild(n("div", "psv-selection-empty", "Temporadas y episodios")) } } else gi.style.display = "none" } } function Ia(e) { return e && e.seasons && e.seasons.length ? e.seasons : [{ id: e ? e.id : "", number: 1 }] } function Ta(e, t, i) { var a = t && void 0 !== t.number && null !== t.number ? t.number : i + 1, n = String(t && (t.title || t.name) || "").trim(), r = String(e && e.title || "").trim().replace(/[\s\-–_]*[TtSs]\d+$/, ""); return r && 0 === n.indexOf(r) && (n = n.substring(r.length)), (n = n.replace(/^[\s\-–_:.]+/, "").trim()) && !/^(?:[TtSs]?\d+[\s\-–_.:]*)+$/.test(n) || (n = "Episodio " + a), n } function Ea(e) { var t = String(e && e.duration || "").trim(), i = /^(\d+):(\d+)(?::(\d+))?$/.exec(t); return i ? i[3] ? (parseInt(i[1], 10) || 0) + " h " + (parseInt(i[2], 10) || 0) + " min" : (parseInt(i[1], 10) || 0) + " min" : t } function Ma() { var e = ke.playerItem; if (e && I(e) && (Vi && xa(), ki || Xa(), ki)) { if (!(e.episodes && e.episodes.length || e._detailsLoaded)) return cn("Cargando capítulos…"), void H(e, function () { "player" === ke.screen && (!ke.playerEpisode && e.episodes && e.episodes.length && (ke.playerEpisode = e.episodes[0], ke.detailEpisode = e.episodes[0]), Ma()) }); !ke.playerEpisode && e.episodes && e.episodes.length && (ke.playerEpisode = e.episodes[0], ke.detailEpisode = e.episodes[0], ke.playerSeasonIndex = ke.detailSeason || 0), ke.episodeBrowserOpen = !0, ke.browserSeason = ke.playerSeasonIndex || 0, ki.classList.add("is-active"), vi(), function () { var e = ke.playerItem; if (!e || !ki) return; var t = Ia(e); ke.browserSeason >= t.length && (ke.browserSeason = 0); ke.browserSeason < 0 && (ke.browserSeason = 0); var i = t[ke.browserSeason], a = t[ke.playerSeasonIndex] || t[0], r = ke.playerEpisode; Ii && (Ii.textContent = e.title || ""); if (Ti) if (r) { var l = []; a && a.number && l.push("T" + a.number), r.number && l.push("E" + r.number), Ti.textContent = "Reproduciendo " + l.join(" ") + " · " + Ta(e, r) } else Ti.textContent = "Elige un episodio"; Oi && (Oi.textContent = "Episodios · Temporada " + (i && i.number || ke.browserSeason + 1)); (function (e, t) { if (!Ei || !Mi) return; o(Ei), Mi.style.display = "flex"; for (var i = 0; i < t.length; i++)(function (e) { var i = n("div", "pe-season focusable", "Temporada " + (t[e].number || e + 1)); e === ke.browserSeason && i.classList.add("is-selected"), i._onFocus = function () { ke.browserSeason !== e && Aa(e, !1) }, i._activate = function () { Aa(e, !0) }, Ei.appendChild(i) })(i) })(0, t), Oa(e, i) }(); var t = (qi ? qi.querySelector(".pe-ep.is-current") : null) || (qi ? Be(qi) : null) || (Mi && "none" !== Mi.style.display ? Be(Ei) : null); t && Fe(t) } } function qa(e) { ki && ke.episodeBrowserOpen && (ke.episodeBrowserOpen = !1, ki.classList.remove("is-active"), !e && "player" === ke.screen && se && Fe(se)) } function Oa(e, t) { if (qi && t) { o(qi); var i = t.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? e.episodes : t._episodes || []; if (!i.length) return qi.appendChild(n("div", "pe-loading", "Cargando episodios…")), void function (e, t, i) { i = i || function () { }, e && t ? t.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? (t._episodes = e.episodes, i(e.episodes)) : t._episodes ? i(t._episodes) : t._loading ? (t._wait = t._wait || [], t._wait.push(i)) : (t._loading = !0, t._wait = [i], D("detail", { contentId: t.id }, function (e, i) { t._loading = !1; var a = !e && i && !1 !== i.returnValue && i.episodes ? i.episodes : []; a.length && (t._episodes = a); var n = t._wait || []; t._wait = []; for (var r = 0; r < n.length; r++)try { n[r](a) } catch (e) { } })) : i([]) }(e, t, function (i) { if (ke.episodeBrowserOpen && (Ia(e)[ke.browserSeason] === t && (Oa(e, t), s(ke.focus, "#pe-episodes")))) { var a = qi.querySelector(".pe-ep.is-current") || Be(qi); a && Fe(a) } }); for (var a = Math.min(i.length, 24), r = 0; r < a; r++)(function (t, i) { var a = n("div", "pe-ep focusable"), r = void 0 !== t.number && null !== t.number ? t.number : i + 1; a.appendChild(n("div", "pe-num", String(r))); var o = n("div", "pe-thumb"), l = n("div", "pe-thumb-play", "▶"); o.appendChild(l), a.appendChild(o); var s = n("div", "pe-info"); s.appendChild(n("div", "pe-name", Ta(e, t, i))); var d = [], c = Ea(t); c && d.push(c), t.quality && d.push(String(t.quality).split(",")[0].toUpperCase()), s.appendChild(n("div", "pe-meta", d.join("   ·   "))), t.description && s.appendChild(n("div", "pe-desc", t.description)), a.appendChild(s); var p = ke.playerEpisode && (ke.playerEpisode.id === t.id || void 0 !== ke.playerEpisode.number && ke.playerEpisode.number === t.number); a.appendChild(n("div", "pe-badge", "▶ REPRODUCIENDO")), p && a.classList.add("is-current"), a._activate = function () { Da(t) }, qi.appendChild(a) })(i[r], r); i.length > a && qi.appendChild(n("div", "pe-loading", "Mostrando los primeros " + a + " capítulos")) } } function Aa(e, t) { var i = ke.playerItem, a = Ia(i); if (a[e] && (ke.browserSeason = e, function () { if (Ei) for (var e = Ei.children, t = 0; t < e.length; t++)e[t].classList.toggle("is-selected", t === ke.browserSeason) }(), Oi && (Oi.textContent = "Episodios · Temporada " + (a[e].number || e + 1)), Oa(i, a[e]), t)) { var n = qi ? qi.querySelector(".pe-ep.is-current") || Be(qi) : null; n && Fe(n) } } function Da(e) { var t = ke.playerItem; if (t && e) { var i = Ia(t), a = i[ke.playerSeasonIndex]; a && a.id === (t.seasonId || t.id) && t.episodes && t.episodes.length && (a._episodes = t.episodes); var n = void 0 !== ke.playerSeasonIndex && null !== ke.playerSeasonIndex ? ke.playerSeasonIndex : ke.browserSeason || 0, r = i[n]; r && (ke.detailSeason !== n && (ke.detailSeason = n, ke.detailNeedsRebuild = !0), r.id && (t.seasonId = r.id), r._episodes && (t.episodes = r._episodes)), qa(), Vi && xa(), Pa(t, e) } } function Pa(e, t) { if (e && t) { ke.playerItem = e, ke.playerEpisode = t, ke.detailEpisode = t, ke.playerSeasonIndex = ke.detailSeason || 0, se && de && bn(), Na(e), ke.episodeSwitchTimer && clearTimeout(ke.episodeSwitchTimer), ke.episodeSwitchSeq = (ke.episodeSwitchSeq || 0) + 1; var i = ke.episodeSwitchSeq; dn(), cn("Cambiando capítulo…"), ke.episodeSwitchTimer = setTimeout(function () { ke.episodeSwitchTimer = null, i === ke.episodeSwitchSeq && ("player" === ke.screen || "detail" === ke.screen) && fn(e, t) }, 600) } } function Na(e) { if (Y) for (var t = Y.querySelectorAll(".detail-episode"), i = 0; i < t.length; i++) { var curEp = t[i]._ep; var a = !!(curEp && ke.detailEpisode && (curEp.id === ke.detailEpisode.id || (curEp.number && curEp.number === ke.detailEpisode.number))); t[i].classList.toggle("is-playing", a) } } function Ra() {
+  } function fi() { pi() } function vi() { ui() } var hi = null, mi = null, gi = null, yi = null, bi = null, Ci = null, wi = null, Si = null, xi = null, _i = null, Li = null, ki = null, Ii = null, Ti = null, Ei = null, Mi = null, qi = null, Oi = null, Ai = null, Di = null, Pi = null, Ni = null, Ri = null, Ui = null, Fi = null, Bi = null, Hi = null, zi = null, Vi = !1, ji = !1, Wi = null, $i = 0, Xi = !1, Qi = null, Gi = !1, Ji = !1, Ki = 0, Yi = "normal", Zi = "white", ea = "contain", ta = [], ia = {}, aa = {}, na = null; function ra(e) { if (!e) return 0; var t = e.replace(",", ".").split(":"); return 3 === t.length ? 3600 * parseFloat(t[0]) + 60 * parseFloat(t[1]) + parseFloat(t[2]) : 0 } function oa(e) { var t = ++Ki; if (!e || !e.url) return ta = [], void (zi && (zi.innerHTML = "")); try { var i = new XMLHttpRequest; i.open("GET", e.url, !0), i.onload = function () { t === Ki && i.status >= 200 && i.status < 300 && (ta = function (e) { var t = []; if (!e) return t; for (var i = e.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n\n"), a = 0; a < i.length; a++) { var n = i[a].trim().split("\n"); if (n.length >= 2) { var r = -1 !== n[0].indexOf("--\x3e") ? n[0] : n[1], o = -1 !== n[0].indexOf("--\x3e") ? n.slice(1) : n.slice(2); if (r && -1 !== r.indexOf("--\x3e")) { var l = r.split("--\x3e"), s = ra(l[0].trim()), d = ra(l[1].trim()), c = o.join("<br>").replace(/<font[^>]*>/gi, "").replace(/<\/font>/gi, "").trim(); c && t.push({ start: s, end: d, text: c }) } } } return t }(i.responseText)) }, i.send() } catch (e) { } } function la() { zi && (zi.classList.remove("size-small", "size-normal", "size-big"), zi.classList.add("size-" + Yi), zi.classList.remove("color-white", "color-yellow", "color-black"), zi.classList.add("color-" + Zi)) } function sa(e) { if (zi) if (Gi && ta && ta.length) { for (var t = null, i = 0; i < ta.length; i++)if (e >= ta[i].start && e <= ta[i].end) { t = ta[i]; break } if (t) { var a = '<span class="player-subtitles-text">' + t.text + "</span>"; zi.innerHTML !== a && (zi.innerHTML = a) } else "" !== zi.innerHTML && (zi.innerHTML = "") } else "" !== zi.innerHTML && (zi.innerHTML = "") } function da() { return "detail" === ke.screen ? ke.detail || null : ke.playerItem || ke.detail || null } var ca = {}; function pa(e) { return e && (e.seriesId || e.id) || "" } function ua(e) { var t = pa(e); ke.streamMode = ca[t] ? "smooth" : "normal" } function fa(e, t) { var i = pa(e); ke.streamMode = t ? "smooth" : "normal", i && (ca[i] = !!t) } function va() { $i = 0, Xi = !1, Qi = null, Gi = !1, Ji = !1, Ki++, ke.trackIndex = 0, ta = [], zi && (zi.innerHTML = "") } function ha(e) { return e && I(e) ? "player" === ke.screen && ke.playerEpisode ? ke.playerEpisode : ke.detailEpisode ? ke.detailEpisode : e.episodes && e.episodes[0] || null : null } function ma(e) { if (!e) return ""; var t = ha(e); return t && t.id ? t.id : e.id || "" } function ga(e, t) { if (t = t || function () { }, !e) return t(null); var i = ma(e); if (!i) return t(null); if (ia[i]) return Ca(ia[i]), t(ia[i]); if (aa[i]) aa[i].push(t); else { aa[i] = [t]; var a = ha(e), n = { contentId: i }, r = e.seasonId || e.id; a && a.id && r && a.id !== r && (n.seriesContentId = r), D("mediaInfo", n, function (e, t) { var a = aa[i] || []; delete aa[i]; var n = !e && t && !1 !== t.returnValue ? t : null; n && (ia[i] = n, Ca(n)); for (var r = 0; r < a.length; r++)try { a[r](n) } catch (e) { } }) } } function ya(e) { if (!e) return 0; var t = (e || "").split(/[\/,]/), bestIdx = 0, bestScore = -1; for (var i = 0; i < t.length; i++) { var raw = t[i].trim().toLowerCase(), score = 10; if (/^(lat|latino|la|spa_lat|es[-_]?419|es[-_]?la)$/i.test(raw)) { score = 100; } else if (/^(spa|esp|es|spanish|espanol)$/i.test(raw) || /\b(spa|esp|es)\b/i.test(raw)) { score = 90; } else if (/^(cast|castellano|spa_es|es[-_]?es)$/i.test(raw)) { score = 80; } else if (/^(eng|en|ing|ingles|english)$/i.test(raw)) { score = 50; } else if (/^(por|pt|portugues|portuguese)$/i.test(raw)) { score = 20; } if (score > bestScore) { bestScore = score; bestIdx = i; } } return bestIdx; } function ba(e) { for (var t = [], i = e && e.subtitles || [], a = 0; a < i.length; a++)t.push({ lang: i[a].lang, url: i[a].url, format: i[a].format }); return t.sort(function (e, t) { return (/^(es|spa|esp)$/i.test(e.lang || "") ? 0 : 1) - (/^(es|spa|esp)$/i.test(t.lang || "") ? 0 : 1) }), t } function Ca(e) { var t = ba(e); if (!Ji) return t.length ? (Gi = !0, void oa(Qi = t[0])) : (Gi = !1, Qi = null, void oa(null)); if (Gi) { if (!t.length) return Gi = !1, Qi = null, void oa(null); var i = !1; if (Qi) for (var a = 0; a < t.length; a++)if (t[a].url === Qi.url) { Qi = t[a], i = !0; break } i || oa(Qi = t[0]) } } function wa() { Wi && clearTimeout(Wi), Wi = setTimeout(function () { xa() }, 8e3) } function Sa() { (hi || Xa(), hi) && (Vi = !0, ji = !1, ui(), _a(), hi.classList.add("is-active"), zi && zi.classList.add("shift-up"), ga(ke.playerItem, function () { Vi && _a() }), wa(), I(ke.playerItem) && Li ? Fe(Li) : bi && Fe(bi)) } function xa() { Wi && (clearTimeout(Wi), Wi = null), Vi = !1, hi && hi.classList.remove("is-active"), zi && zi.classList.remove("shift-up"), _lastBackTime = Date.now(), Ve = Date.now() + 500, "player" !== ke.screen || ji || Fe(se) } function _a() { var e = ke.focus ? s(ke.focus, ".psv-row") : null, t = e ? e.id : "", i = e && ke.focus ? ke.focus.textContent : ""; if (ka(), updatePsvAudio(), Ra(), Ua(), La(), Vi && t && hi) for (var a = hi.querySelectorAll(".psv-row"), n = 0; n < a.length; n++)if (a[n].id === t) { for (var r = a[n].querySelectorAll(".focusable"), o = null, l = 0; l < r.length; l++)if (r[l].textContent === i) { o = r[l]; break } var d = o || Be(a[n]); d && Fe(d, !0); break } } function La() { if (hi) { for (var e = hi.querySelectorAll(".psv-row"), t = 0; t < e.length; t++)e[t].classList.remove("is-row-focused"); var i = ke.focus ? s(ke.focus, ".psv-row") : null; i && i.classList.add("is-row-focused") } } function ka() { if (gi) { var e = ke.playerItem; if (e && I(e)) { if (gi.style.display = "block", yi) { o(yi); var t = Ia(e), i = t[ke.playerSeasonIndex] || t[0], a = i && i.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? e.episodes : i && i._episodes || e.episodes || []; if (a.length) { for (var r = 0, l = 0; l < a.length; l++)if (ke.playerEpisode && (a[l].id === ke.playerEpisode.id || a[l].number === ke.playerEpisode.number)) { r = l; break } var s = Nt(a.length); (void 0 === ke.playerEpisodeRange || ke.playerEpisodeRange >= s.length) && (ke.playerEpisodeRange = Math.floor(r / 20)); for (var d = s[ke.playerEpisodeRange] || s[0], c = n("div", "psv-episode-numbers"), p = d.start; p < d.end; p++)(function (e, t) { var i = String(void 0 !== e.number && null !== e.number ? e.number : t + 1), a = n("button", "psv-ep-btn focusable" + (t === r ? " is-selected" : ""), i); a._activate = function () { Da(e) }, c.appendChild(a) })(a[p], p); yi.appendChild(c); for (var u = n("div", "psv-episode-ranges"), f = 0; f < s.length; f++)(function (e, t) { var i = n("button", "psv-range-btn focusable" + (e === ke.playerEpisodeRange ? " is-selected" : ""), t.start + 1 + "-" + t.end); i._activate = function () { ke.playerEpisodeRange = e, ka(); var t = yi.querySelector(".psv-ep-btn"); t && Fe(t) }, u.appendChild(i) })(f, s[f]); yi.appendChild(u) } else yi.appendChild(n("div", "psv-selection-empty", "Temporadas y episodios")) } } else gi.style.display = "none" } } function Ia(e) { return e && e.seasons && e.seasons.length ? e.seasons : [{ id: e ? e.id : "", number: 1 }] } function Ta(e, t, i) { var a = t && void 0 !== t.number && null !== t.number ? t.number : i + 1, n = String(t && (t.title || t.name) || "").trim(), r = String(e && e.title || "").trim().replace(/[\s\-–_]*[TtSs]\d+$/, ""); return r && 0 === n.indexOf(r) && (n = n.substring(r.length)), (n = n.replace(/^[\s\-–_:.]+/, "").trim()) && !/^(?:[TtSs]?\d+[\s\-–_.:]*)+$/.test(n) || (n = "Episodio " + a), n } function Ea(e) { var t = String(e && e.duration || "").trim(), i = /^(\d+):(\d+)(?::(\d+))?$/.exec(t); return i ? i[3] ? (parseInt(i[1], 10) || 0) + " h " + (parseInt(i[2], 10) || 0) + " min" : (parseInt(i[1], 10) || 0) + " min" : t } function Ma() { var e = ke.playerItem; if (e && I(e) && (Vi && xa(), ki || Xa(), ki)) { if (!(e.episodes && e.episodes.length || e._detailsLoaded)) return cn("Cargando capítulos…"), void H(e, function () { "player" === ke.screen && (!ke.playerEpisode && e.episodes && e.episodes.length && (ke.playerEpisode = e.episodes[0], ke.detailEpisode = e.episodes[0]), Ma()) }); !ke.playerEpisode && e.episodes && e.episodes.length && (ke.playerEpisode = e.episodes[0], ke.detailEpisode = e.episodes[0], ke.playerSeasonIndex = ke.detailSeason || 0), ke.episodeBrowserOpen = !0, ke.browserSeason = ke.playerSeasonIndex || 0, ki.classList.add("is-active"), vi(), function () { var e = ke.playerItem; if (!e || !ki) return; var t = Ia(e); ke.browserSeason >= t.length && (ke.browserSeason = 0); ke.browserSeason < 0 && (ke.browserSeason = 0); var i = t[ke.browserSeason], a = t[ke.playerSeasonIndex] || t[0], r = ke.playerEpisode; Ii && (Ii.textContent = e.title || ""); if (Ti) if (r) { var l = []; a && a.number && l.push("T" + a.number), r.number && l.push("E" + r.number), Ti.textContent = "Reproduciendo " + l.join(" ") + " · " + Ta(e, r) } else Ti.textContent = "Elige un episodio"; Oi && (Oi.textContent = "Episodios · Temporada " + (i && i.number || ke.browserSeason + 1)); (function (e, t) { if (!Ei || !Mi) return; o(Ei), Mi.style.display = "flex"; for (var i = 0; i < t.length; i++)(function (e) { var i = n("div", "pe-season focusable", "Temporada " + (t[e].number || e + 1)); e === ke.browserSeason && i.classList.add("is-selected"), i._onFocus = function () { ke.browserSeason !== e && Aa(e, !1) }, i._activate = function () { Aa(e, !0) }, Ei.appendChild(i) })(i) })(0, t), Oa(e, i) }(); var t = (qi ? qi.querySelector(".pe-ep.is-current") : null) || (qi ? Be(qi) : null) || (Mi && "none" !== Mi.style.display ? Be(Ei) : null); t && Fe(t) } } function qa(e) { ki && ke.episodeBrowserOpen && (ke.episodeBrowserOpen = !1, ki.classList.remove("is-active"), !e && "player" === ke.screen && se && Fe(se)) } function Oa(e, t) { if (qi && t) { o(qi); var i = t.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? e.episodes : t._episodes || []; if (!i.length) return qi.appendChild(n("div", "pe-loading", "Cargando episodios…")), void function (e, t, i) { i = i || function () { }, e && t ? t.id === (e.seasonId || e.id) && e.episodes && e.episodes.length ? (t._episodes = e.episodes, i(e.episodes)) : t._episodes ? i(t._episodes) : t._loading ? (t._wait = t._wait || [], t._wait.push(i)) : (t._loading = !0, t._wait = [i], D("detail", { contentId: t.id }, function (e, i) { t._loading = !1; var a = !e && i && !1 !== i.returnValue && i.episodes ? i.episodes : []; a.length && (t._episodes = a); var n = t._wait || []; t._wait = []; for (var r = 0; r < n.length; r++)try { n[r](a) } catch (e) { } })) : i([]) }(e, t, function (i) { if (ke.episodeBrowserOpen && (Ia(e)[ke.browserSeason] === t && (Oa(e, t), s(ke.focus, "#pe-episodes")))) { var a = qi.querySelector(".pe-ep.is-current") || Be(qi); a && Fe(a) } }); for (var a = Math.min(i.length, 24), r = 0; r < a; r++)(function (t, i) { var a = n("div", "pe-ep focusable"), r = void 0 !== t.number && null !== t.number ? t.number : i + 1; a.appendChild(n("div", "pe-num", String(r))); var o = n("div", "pe-thumb"), l = n("div", "pe-thumb-play", "▶"); o.appendChild(l), a.appendChild(o); var s = n("div", "pe-info"); s.appendChild(n("div", "pe-name", Ta(e, t, i))); var d = [], c = Ea(t); c && d.push(c), t.quality && d.push(String(t.quality).split(",")[0].toUpperCase()), s.appendChild(n("div", "pe-meta", d.join("   ·   "))), t.description && s.appendChild(n("div", "pe-desc", t.description)), a.appendChild(s); var p = ke.playerEpisode && (ke.playerEpisode.id === t.id || void 0 !== ke.playerEpisode.number && ke.playerEpisode.number === t.number); a.appendChild(n("div", "pe-badge", "▶ REPRODUCIENDO")), p && a.classList.add("is-current"), a._activate = function () { Da(t) }, qi.appendChild(a) })(i[r], r); i.length > a && qi.appendChild(n("div", "pe-loading", "Mostrando los primeros " + a + " capítulos")) } } function Aa(e, t) { var i = ke.playerItem, a = Ia(i); if (a[e] && (ke.browserSeason = e, function () { if (Ei) for (var e = Ei.children, t = 0; t < e.length; t++)e[t].classList.toggle("is-selected", t === ke.browserSeason) }(), Oi && (Oi.textContent = "Episodios · Temporada " + (a[e].number || e + 1)), Oa(i, a[e]), t)) { var n = qi ? qi.querySelector(".pe-ep.is-current") || Be(qi) : null; n && Fe(n) } } function Da(e) { var t = ke.playerItem; if (t && e) { var i = Ia(t), a = i[ke.playerSeasonIndex]; a && a.id === (t.seasonId || t.id) && t.episodes && t.episodes.length && (a._episodes = t.episodes); var n = void 0 !== ke.playerSeasonIndex && null !== ke.playerSeasonIndex ? ke.playerSeasonIndex : ke.browserSeason || 0, r = i[n]; r && (ke.detailSeason !== n && (ke.detailSeason = n, ke.detailNeedsRebuild = !0), r.id && (t.seasonId = r.id), r._episodes && (t.episodes = r._episodes)), qa(), Vi && xa(), Pa(t, e) } } function Pa(e, t) { if (e && t) { if ("vod" === ke.playerMode && pe && pe.currentTime > 5 && ke.playerItem && ke.playerEpisode && ke.playerEpisode !== t) { saveVodProgress(ke.playerItem, ke.playerEpisode, pe.currentTime); } dn(); if (pe) { try { pe.currentTime = 0; } catch (err) { } } saveVodProgress(e, t, 0); ke.playerItem = e, ke.playerEpisode = t, ke.detailEpisode = t, ke.playerSeasonIndex = ke.detailSeason || 0, se && de && bn(), Na(e), ke.episodeSwitchTimer && clearTimeout(ke.episodeSwitchTimer), ke.episodeSwitchSeq = (ke.episodeSwitchSeq || 0) + 1; var i = ke.episodeSwitchSeq; cn("Cambiando capítulo…"), ke.episodeSwitchTimer = setTimeout(function () { ke.episodeSwitchTimer = null, i === ke.episodeSwitchSeq && ("player" === ke.screen || "detail" === ke.screen) && fn(e, t, 0) }, 400) } } function Na(e) { if (Y) for (var t = Y.querySelectorAll(".detail-episode"), i = 0; i < t.length; i++) { var curEp = t[i]._ep; var a = !!(curEp && ke.detailEpisode && (curEp.id === ke.detailEpisode.id || (curEp.number && curEp.number === ke.detailEpisode.number))); t[i].classList.toggle("is-playing", a) } } function Ra() {
     var row = r("psv-player-row");
     if (!row) return;
     var sec = r("psv-sec-player");
@@ -2762,7 +2953,7 @@
       if (!i) i = Ai && Ai.querySelector(".focusable") || Di || Hi;
       i && Fe(i);
     }
-  } function Ha() { ji = !1, mi && mi.classList.remove("is-active"), _lastBackTime = Date.now(), Ve = Date.now() + 500, Vi ? (bi && Fe(bi), wa()) : na && Ne(na) ? Fe(na) : "player" === ke.screen && Fe(se), na = null } function za() { if (!Ai) return; o(Ai); var item = da(), e = item ? ia[ma(item)] : null, audioStr = (e && e.audio) || (item && item.streamAudioInfo) || (e && e.streamAudioInfo) || ""; var t = []; if (pe && pe.audioTracks && pe.audioTracks.length > 1) { for (var k = 0; k < pe.audioTracks.length; k++) { var at = pe.audioTracks[k], code = at.language || at.label || ""; t.push({ index: k, code: code, label: ja(code, k) }); } } else if (audioStr) { var parts = audioStr.split(/[\/,]/), hasLatino = !1; for (var p = 0; p < parts.length; p++) { if (/^(lat|latino|la)$/i.test(parts[p].trim())) hasLatino = !0; } var spaCount = 0; for (var a = 0; a < parts.length; a++) { var nStr = parts[a].trim(); if (nStr) { var lbl = ja(nStr, a); if (/^(spa|esp|es)$/i.test(nStr)) { spaCount++; lbl = hasLatino ? "Castellano" : (spaCount === 1 ? "Español Latino" : "Castellano"); } t.push({ index: a, code: nStr, label: lbl }); } } } if (!t.length) { t = [{ index: 0, code: "spa", label: "Español Latino" }]; } var selIdx = typeof $i === "number" ? $i : 0; if (pe && pe.audioTracks && pe.audioTracks.length > 1) { for (var k = 0; k < pe.audioTracks.length; k++) { if (pe.audioTracks[k].enabled) { selIdx = k; break; } } } for (var i = 0; i < t.length; i++)(function (tr) { var btn = n("button", "dps-btn focusable"); btn.textContent = tr.label; tr.index === selIdx && btn.classList.add("is-selected"); btn._activate = function () { Wa(tr.index); za(); wa(); }; Ai.appendChild(btn); })(t[i]); } function Va() { var e = ba(ia[ma(da())]); if (Di) { var t = Di.parentNode; t && t.classList.toggle("is-hidden", !e.length), Di.classList.toggle("is-on", Gi); var i = Di.querySelector(".dps-switch-text"); i && (i.textContent = Gi ? "ON" : "OFF") } if (Pi && Pi.classList.toggle("is-visible", Gi && e.length > 0), Ni && Ni.classList.toggle("is-visible", Gi && e.length > 0), Ri && Ri.classList.toggle("is-visible", Gi && e.length > 0), Gi) { if (Ui) { o(Ui); for (var a = 0; a < e.length; a++)(function (e) { var t = n("button", "dps-btn focusable"); t.textContent = ja(e.lang || "Sub"), Qi && Qi.url === e.url && t.classList.add("is-selected"), t._activate = function () { Qi = e, Gi = !0, Ji = !0, oa(e), Va(), wa() }, Ui.appendChild(t) })(e[a]) } if (Fi) for (var r = Fi.querySelectorAll(".dps-btn"), l = 0; l < r.length; l++) { var s = r[l].getAttribute("data-size"); r[l].classList.toggle("is-selected", s === Yi) } if (Bi) for (var d = Bi.querySelectorAll(".dps-btn"), c = 0; c < d.length; c++) { var p = d[c].getAttribute("data-style"); d[c].classList.toggle("is-selected", p === Zi) } } } function ja(e, idx) { var t = (e || "").toLowerCase().trim().split(/[-_]/)[0]; if (/^(lat|latino|la)$/i.test(t)) return "Español Latino"; if (/^(cast|castellano)$/i.test(t)) return "Castellano"; if (/^(spa|esp|es)$/i.test(t)) return "Español Latino"; if (/^(eng|ing|en|ingles)$/i.test(t)) return "Inglés"; if (/^(por|pt|portugues)$/i.test(t)) return "Portugués"; if (/^(fra|fre|fr|franc|frances)$/i.test(t)) return "Francés"; if (/^(ita|it|italiano)$/i.test(t)) return "Italiano"; if (/^(jpn|jap|ja|japones)$/i.test(t)) return "Japonés"; if (/^(kor|cor|ko|coreano)$/i.test(t)) return "Coreano"; if (/^(deu|ger|de|aleman)$/i.test(t)) return "Alemán"; if (/^(rus|ru|ruso)$/i.test(t)) return "Ruso"; if (/^(chi|zho|zh|chino)$/i.test(t)) return "Chino"; return e ? (e.charAt(0).toUpperCase() + e.slice(1)) : ("Pista " + ((idx || 0) + 1)) } function Wa(e) {
+  } function Ha() { ji = !1, mi && mi.classList.remove("is-active"), _lastBackTime = Date.now(), Ve = Date.now() + 500, Vi ? (bi && Fe(bi), wa()) : na && Ne(na) ? Fe(na) : "player" === ke.screen && Fe(se), na = null } function za() { if (!Ai) return; o(Ai); var item = da(), e = item ? ia[ma(item)] : null, audioStr = (e && e.audio) || (item && item.streamAudioInfo) || (e && e.streamAudioInfo) || ""; var t = []; if (pe && pe.audioTracks && pe.audioTracks.length > 1) { for (var k = 0; k < pe.audioTracks.length; k++) { var at = pe.audioTracks[k], code = at.language || at.label || ""; t.push({ index: k, code: code, label: ja(code, k) }); } } else if (audioStr) { var parts = audioStr.split(/[\/,]/); for (var a = 0; a < parts.length; a++) { var nStr = parts[a].trim(); if (nStr) { t.push({ index: a, code: nStr, label: ja(nStr, a) }); } } } var spaList = []; for (var k = 0; k < t.length; k++) { var rawText = ((t[k].code || "") + " " + (t[k].label || "")).toLowerCase(); if (/latino|castellano|español|espanol|\bspa\b|\bes\b|\besp\b/i.test(rawText)) { spaList.push(t[k]); } } if (spaList.length > 1) { var hasCas = false, hasLat = false; for (var s = 0; s < spaList.length; s++) { var rawC = ((spaList[s].code || "") + " " + (spaList[s].label || "")).toLowerCase(); if (/castellano|españa|spain|es[-_]?es|spa[-_]?es/i.test(rawC)) { spaList[s].label = "Castellano"; hasCas = true; } else if (/latino|es[-_]?419|\bla\b/i.test(rawC)) { spaList[s].label = "Español Latino"; hasLat = true; } } if (!hasCas || !hasLat) { spaList[0].label = "Español Latino"; spaList[1].label = "Castellano"; } } if (!t.length) { t = [{ index: 0, code: "spa", label: "Español Latino" }]; } var selIdx = typeof $i === "number" ? $i : 0; if (pe && pe.audioTracks && pe.audioTracks.length > 1) { for (var k = 0; k < pe.audioTracks.length; k++) { if (pe.audioTracks[k].enabled) { selIdx = k; break; } } } for (var i = 0; i < t.length; i++)(function (tr) { var btn = n("button", "dps-btn focusable"); btn.textContent = tr.label; tr.index === selIdx && btn.classList.add("is-selected"); btn._activate = function () { Wa(tr.index); za(); wa(); }; Ai.appendChild(btn); })(t[i]); } function Va() { var e = ba(ia[ma(da())]); if (Di) { var t = Di.parentNode; t && t.classList.toggle("is-hidden", !e.length), Di.classList.toggle("is-on", Gi); var i = Di.querySelector(".dps-switch-text"); i && (i.textContent = Gi ? "ON" : "OFF") } if (Pi && Pi.classList.toggle("is-visible", Gi && e.length > 0), Ni && Ni.classList.toggle("is-visible", Gi && e.length > 0), Ri && Ri.classList.toggle("is-visible", Gi && e.length > 0), Gi) { if (Ui) { o(Ui); for (var a = 0; a < e.length; a++)(function (e) { var t = n("button", "dps-btn focusable"); t.textContent = ja(e.lang || "Sub"), Qi && Qi.url === e.url && t.classList.add("is-selected"), t._activate = function () { Qi = e, Gi = !0, Ji = !0, oa(e), Va(), wa() }, Ui.appendChild(t) })(e[a]) } if (Fi) for (var r = Fi.querySelectorAll(".dps-btn"), l = 0; l < r.length; l++) { var s = r[l].getAttribute("data-size"); r[l].classList.toggle("is-selected", s === Yi) } if (Bi) for (var d = Bi.querySelectorAll(".dps-btn"), c = 0; c < d.length; c++) { var p = d[c].getAttribute("data-style"); d[c].classList.toggle("is-selected", p === Zi) } } } function ja(e, idx) { var raw = (e || "").toLowerCase().trim(); if (/castellano|españa|spain|es[-_]?es|spa[-_]?es|es[-_]?(?:cas|cast)/i.test(raw)) return "Castellano"; if (/latino|lat|la\b|es[-_]?419|es[-_]?(?:la|lat|mx|ar|co|cl|pe|us)/i.test(raw)) return "Español Latino"; var t = raw.split(/[-_]/)[0]; if (/^(lat|latino|la)$/i.test(t)) return "Español Latino"; if (/^(cast|castellano)$/i.test(t)) return "Castellano"; if (/^(spa|esp|es)$/i.test(t)) return "Español Latino"; if (/^(eng|ing|en|ingles|english)$/i.test(t)) return "Inglés"; if (/^(por|pt|portugues|portuguese|brasil|brazil|pob)$/i.test(t)) return "Portugués"; if (/^(fra|fre|fr|franc|frances|french)$/i.test(t)) return "Francés"; if (/^(ita|it|italiano|italian)$/i.test(t)) return "Italiano"; if (/^(jpn|jap|ja|japones|japanese)$/i.test(t)) return "Japonés"; if (/^(kor|cor|ko|coreano|korean)$/i.test(t)) return "Coreano"; if (/^(deu|ger|de|aleman|german)$/i.test(t)) return "Alemán"; if (/^(rus|ru|ruso|russian)$/i.test(t)) return "Ruso"; if (/^(chi|zho|zh|chino|chinese)$/i.test(t)) return "Chino"; return e ? (e.charAt(0).toUpperCase() + e.slice(1)) : ("Pista " + ((idx || 0) + 1)) } function Wa(e) {
     $i = e; Xi = !0;
     if (pe && pe.audioTracks && pe.audioTracks.length > 1) {
       try {
@@ -3429,8 +3620,9 @@
         row._channelData = ch;
         row._idx = idx;
         var ic = n("div", "ic");
-        if (ch.logo) {
-          ic.style.backgroundImage = "url(" + ch.logo + ")";
+        var chLogo = getChannelLogo(ch);
+        if (chLogo) {
+          ic.style.backgroundImage = "url(" + chLogo + ")";
           ic.style.backgroundSize = "contain";
           ic.style.backgroundRepeat = "no-repeat";
           ic.style.backgroundPosition = "center";
@@ -3729,8 +3921,9 @@
 
         // 1. Logo
         var s = n("div", "ic");
-        if (ch.logo) {
-          s.style.backgroundImage = "url(" + ch.logo + ")";
+        var chLogo = getChannelLogo(ch);
+        if (chLogo) {
+          s.style.backgroundImage = "url(" + chLogo + ")";
           s.style.backgroundSize = "contain";
           s.style.backgroundRepeat = "no-repeat";
           s.style.backgroundPosition = "center";
@@ -3941,6 +4134,46 @@
       t && (Ka = t[1]), en = "", tn = 0;
       startSec <= 0 && cn("Conectando con el vídeo…");
       ke.streamError = "";
+      function _autoSelectBestAudioTrack() {
+        if (!pe || !pe.audioTracks || pe.audioTracks.length <= 1) return;
+        if (Xi && typeof $i === "number" && $i >= 0 && $i < pe.audioTracks.length) {
+          try {
+            for (var k = 0; k < pe.audioTracks.length; k++) {
+              pe.audioTracks[k].enabled = (k === $i);
+            }
+          } catch (err) { }
+          return;
+        }
+        var bestIdx = 0, bestScore = -1;
+        for (var k = 0; k < pe.audioTracks.length; k++) {
+          var at = pe.audioTracks[k];
+          var raw = ((at.language || "") + " " + (at.label || "")).toLowerCase().trim();
+          var score = 10;
+          if (/latino|lat|la\b|es[-_]?419|es[-_]?(?:la|lat|mx|ar|co|cl|pe|us)/i.test(raw)) {
+            score = 100;
+          } else if (/^(spa|esp|es|spanish|espanol)$/i.test(raw) || /\b(spa|esp|es|spanish|espanol)\b/i.test(raw)) {
+            score = 90;
+          } else if (/castellano|españa|spain|es[-_]?es|spa[-_]?es/i.test(raw)) {
+            score = 80;
+          } else if (/^(eng|en|ing|ingles|english)$/i.test(raw) || /\b(eng|en|ing|ingles|english)\b/i.test(raw)) {
+            score = 50;
+          } else if (/por|pt|portugues|portuguese|brasil|brazil/i.test(raw)) {
+            score = 20;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestIdx = k;
+          }
+        }
+        if (bestIdx >= 0) {
+          try {
+            for (var k = 0; k < pe.audioTracks.length; k++) {
+              pe.audioTracks[k].enabled = (k === bestIdx);
+            }
+            $i = bestIdx;
+          } catch (err) { }
+        }
+      }
       pe.onerror = function () {
         ln();
         var errCode = pe.error && pe.error.code;
@@ -3953,12 +4186,17 @@
       pe.oncanplay = function () {
         ln();
         _clearVideoLoadingState();
+        _autoSelectBestAudioTrack();
         _ensurePlaying();
       };
       pe.onloadedmetadata = function () {
         _clearVideoLoadingState();
+        _autoSelectBestAudioTrack();
         if ("vod" === ke.playerMode) {
-          var cur = startSec > 0 ? startSec : (pe.currentTime || 0), dur = _resolveVodDuration();
+          var cur = startSec > 0 ? startSec : 0, dur = _resolveVodDuration();
+          if (startSec <= 0) {
+            try { pe.currentTime = 0; } catch (err) { }
+          }
           oi(cur, dur);
         }
       };
@@ -3970,6 +4208,7 @@
       };
       pe.onplaying = function () {
         _clearVideoLoadingState();
+        _autoSelectBestAudioTrack();
         ke.streamError = "";
         cn("");
         "vod" === ke.playerMode && li("none");
@@ -4075,6 +4314,11 @@
       try {
         pe.autoplay = !0;
         pe.load();
+        try {
+          if (pe.audioTracks && typeof pe.audioTracks.addEventListener === "function") {
+            pe.audioTracks.addEventListener("addtrack", _autoSelectBestAudioTrack);
+          }
+        } catch (err) { }
         setTimeout(function () { pe && pe.paused && !pe.error && "player" === ke.screen && _ensurePlaying() }, 600);
       } catch (e) {
         setTimeout(_ensurePlaying, 600);
@@ -4083,7 +4327,7 @@
   }
   function _clearVideoLoadingState() { _clearWait(), cn("") } function un(e, t) {
     if (e && (e.portal || ("portal" === h.mode && String(e.id || "").length > 15))) e._portal = !0; var i = Za; function a() {
-      var a = { contentId: e.id }; a.playbackMode = ke.streamMode, a.forceRelay = "smooth" === ke.streamMode || "relay" === ke.streamMode, a.trackIndex = ke.trackIndex || 0; var n = ia[ma(e)]; if (n && !Xi && ($i = ya(n.audio)), a.audioTrack = $i || 0, I(e)) { var r = ke.playerEpisode, o = e.seasonId || e.id; if (r && r.id) a.contentId = r.id, a.seriesContentId = o; else { if (!e.episodes || !e.episodes.length) return t(""); ke.playerEpisode = e.episodes[0], a.contentId = e.episodes[0].id, a.seriesContentId = o } } D(a.forceRelay ? "resolveSmooth" : "resolve", a, function (a, n) {
+      var a = { contentId: e.id }; a.playbackMode = ke.streamMode, a.forceRelay = "smooth" === ke.streamMode || "relay" === ke.streamMode, a.trackIndex = ke.trackIndex || 0; var n = ia[ma(e)]; if (n && !Xi && typeof ya === "function") { $i = ya(n.audio); } a.audioTrack = (typeof $i === "number" ? $i : 0); if (I(e)) { var r = ke.playerEpisode, o = e.seasonId || e.id; if (r && r.id) a.contentId = r.id, a.seriesContentId = o; else { if (!e.episodes || !e.episodes.length) return t(""); ke.playerEpisode = e.episodes[0], a.contentId = e.episodes[0].id, a.seriesContentId = o } } D(a.forceRelay ? "resolveSmooth" : "resolve", a, function (a, n) {
         if (i === Za) {
           if (a || !n || !1 === n.returnValue) {
             if (!e._retryCount) e._retryCount = 0;
@@ -4095,11 +4339,11 @@
             e._retryCount = 0;
             var userMsg = (a && String(a).length < 60 && !/[\u4e00-\u9fa5]|aaa/i.test(String(a))) ? String(a) : "Error de servidor. Reintentando reproducción…";
             return ke.streamError = userMsg, cn(ke.streamError), t("");
-          } e.streamMime = n.mime || "", e.streamCodec = n.codec || "", n.duration > 0 ? (e.duration = n.duration, ke.playerEpisode && (ke.playerEpisode.duration = n.duration)) : e.duration = e.duration || 0, e.subtitles = n.subtitles || [], e.streamAudioInfo = n.audio || "", e.isHls = !!n.isHls; try { window.__xuperStreamInfo = { selectedTrack: n.selectedTrack || {}, availableTracks: n.availableTracks || [] } } catch (e) { } t(n.proxyPath || n.url || "")
+          } e.streamMime = n.mime || "", e.streamCodec = n.codec || "", n.duration > 0 ? (e.duration = n.duration, ke.playerEpisode && (ke.playerEpisode.duration = n.duration)) : e.duration = e.duration || 0, e.subtitles = n.subtitles || [], e.streamAudioInfo = n.audio || "", e.isHls = !!n.isHls; if (!Xi && n) { if (typeof n.selectedAudio === "number") $i = n.selectedAudio; else if (n.audio && typeof ya === "function") $i = ya(n.audio); } try { window.__xuperStreamInfo = { selectedTrack: n.selectedTrack || {}, availableTracks: n.availableTracks || [] } } catch (e) { } t(n.proxyPath || n.url || "")
         }
       })
-    } if (I(e) && !ke.playerEpisode && (!e.episodes || !e.episodes.length) && !e._detailsLoaded) return cn("Cargando capítulos…"), void H(e, function () { i === Za && a() }); a()
-  } function fn(e, t, customStartTime) { if (pe) { t && (ke.playerEpisode = t, ke.playerSeasonIndex = ke.detailSeason || 0), e && (ke.playerItem = e); var i = e || ke.playerItem; if (i && ua(i), dn(), i) { if (!Xi) { $i = 0; } ga(i); var startTime = 0; if (typeof customStartTime === "number" && isFinite(customStartTime) && customStartTime > 0) { startTime = customStartTime; } else { var prog = getVodProgress(i.id); if (prog && prog.progress > 10) { if (I(i)) { var epMatch = t && ((prog.episodeId && t.id === prog.episodeId) || (prog.episodeNumber && t.number === prog.episodeNumber)); if (epMatch) startTime = prog.progress; } else { startTime = prog.progress; } } } var isPortal = !0 === i._portal || !0 === i.portal || ("portal" === h.mode && String(i.id || "").length > 15); if (isPortal) { i._portal = !0; var a = t && (t.number || t.seriesNumber) || ""; var loadMsg = a ? "Cargando capítulo " + a + "…" : "Cargando…"; if (startTime > 10) { var mins = Math.floor(startTime / 60), secs = Math.floor(startTime % 60), tStr = (mins > 0 ? (mins + "m ") : "") + secs + "s"; loadMsg += " (Reanudando en " + tStr + ")"; } return cn(loadMsg), void un(i, function (e) { e ? pn(e, startTime) : ke.streamError || cn("Sin fuente de reproducción") }) } i.streamUrl && pn(i.streamUrl, startTime) } } } function vn(e, t) { if ("vod" === ke.playerMode && pe && pe.currentTime > 5 && ke.playerItem) { saveVodProgress(ke.playerItem, ke.playerEpisode, pe.currentTime); } se || Xa(), ke.playerMode = "vod"; var c = t || (e && e.episodes && e.episodes[0]) || ke.playerEpisode || null, p = ke.playerItem && e && (String(ke.playerItem.id) === String(e.id)) && (!c || !ke.playerEpisode || (c.id ? String(c.id) === String(ke.playerEpisode.id) : c.number === ke.playerEpisode.number)), u = p && pe && (pe.currentSrc || pe.src) && !pe.ended; p || va(), e && (ke.playerItem = e), t && (ke.playerEpisode = t), e && ua(e), ke.playerReturn = { screen: "detail", focus: ke.focus }; var i = r("screen-player"), a = r("screen-detail"); i && (i.classList.remove("is-mini"), i.classList.add("is-active")), a && a.classList.remove("is-active"), ke.screen = "player", se.classList.add("is-vod"), bn(), Fe(se), fi(), u ? pe.paused && function () { try { var e = pe.play(); e && e.catch && e.catch(function () { }) } catch (e) { } }() : fn(ke.playerItem, ke.playerEpisode) } function hn(e, t, i) { "vod" !== e || "detail" !== ke.screen ? (se || Xa(), "live" === e && ht(), ke.playerMode = e, t && ke.playerItem !== t && va(), ke.playerItem = t || null, ke.playerEpisode = i || null, "vod" === e && t && ua(t), ke.playerReturn = { screen: ke.screen, focus: ke.focus }, ke.channelsOpen = !1, de.classList.remove("is-active"), ce.classList.remove("is-active"), se.classList.toggle("is-vod", "vod" === e), bn(), ze("player"), Fe(se), bn(), "vod" === e ? (fi(), fn(ke.playerItem, ke.playerEpisode)) : (pi(), yn(z[ke.channel]))) : vn(t, i) } var mn = 0, gn = null; function yn(e, t) {
+    } function proceed() { if (i === Za) a(); } if (I(e) && !ke.playerEpisode && (!e.episodes || !e.episodes.length) && !e._detailsLoaded) return cn("Cargando capítulos…"), void H(e, function () { i === Za && proceed(); }); if (!ia[ma(e)] && !Xi) { ga(e, function () { proceed(); }); } else { proceed(); }
+  } function fn(e, t, customStartTime) { if (pe) { t && (ke.playerEpisode = t, ke.playerSeasonIndex = ke.detailSeason || 0), e && (ke.playerItem = e); var i = e || ke.playerItem; if (i && ua(i), dn(), i) { if (!Xi) { $i = 0; } ga(i); var startTime = 0; if (typeof customStartTime === "number" && isFinite(customStartTime) && customStartTime >= 0) { startTime = customStartTime; } else { var prog = getVodProgress(i.id); if (prog && prog.progress > 10) { if (I(i)) { var epMatch = t && ((prog.episodeId && t.id === prog.episodeId) || (prog.episodeNumber && t.number === prog.episodeNumber)); if (epMatch) startTime = prog.progress; } else { startTime = prog.progress; } } } var isPortal = !0 === i._portal || !0 === i.portal || ("portal" === h.mode && String(i.id || "").length > 15); if (isPortal) { i._portal = !0; var a = t && (t.number || t.seriesNumber) || ""; var loadMsg = a ? "Cargando capítulo " + a + "…" : "Cargando…"; if (startTime > 10) { var mins = Math.floor(startTime / 60), secs = Math.floor(startTime % 60), tStr = (mins > 0 ? (mins + "m ") : "") + secs + "s"; loadMsg += " (Reanudando en " + tStr + ")"; } return cn(loadMsg), void un(i, function (e) { e ? pn(e, startTime) : ke.streamError || cn("Sin fuente de reproducción") }) } i.streamUrl && pn(i.streamUrl, startTime) } } } function vn(e, t) { if ("vod" === ke.playerMode && pe && pe.currentTime > 5 && ke.playerItem) { saveVodProgress(ke.playerItem, ke.playerEpisode, pe.currentTime); } se || Xa(), ke.playerMode = "vod"; var c = t || (e && e.episodes && e.episodes[0]) || ke.playerEpisode || null, p = ke.playerItem && e && (String(ke.playerItem.id) === String(e.id)) && (!c || !ke.playerEpisode || (c.id ? String(c.id) === String(ke.playerEpisode.id) : c.number === ke.playerEpisode.number)), u = p && pe && (pe.currentSrc || pe.src) && !pe.ended; p || va(), e && (ke.playerItem = e), t && (ke.playerEpisode = t), e && ua(e), ke.playerReturn = { screen: "detail", focus: ke.focus }; var i = r("screen-player"), a = r("screen-detail"); i && (i.classList.remove("is-mini"), i.classList.add("is-active")), a && a.classList.remove("is-active"), ke.screen = "player", se.classList.add("is-vod"), bn(), Fe(se), fi(), u ? pe.paused && function () { try { var e = pe.play(); e && e.catch && e.catch(function () { }) } catch (e) { } }() : fn(ke.playerItem, ke.playerEpisode) } function hn(e, t, i) { "vod" !== e || "detail" !== ke.screen ? (se || Xa(), "live" === e && ht(), ke.playerMode = e, t && ke.playerItem !== t && va(), ke.playerItem = t || null, ke.playerEpisode = i || null, "vod" === e && t && ua(t), ke.playerReturn = { screen: ke.screen, focus: ke.focus }, ke.channelsOpen = !1, de.classList.remove("is-active"), ce.classList.remove("is-active"), se.classList.toggle("is-vod", "vod" === e), bn(), ze("player"), Fe(se), bn(), "vod" === e ? (fi(), fn(ke.playerItem, ke.playerEpisode)) : (pi(), yn(z[ke.channel]))) : vn(t, i) } var mn = 0, gn = null; function yn(e, t) {
     if (gn && (clearTimeout(gn), gn = null), e || (e = z[ke.channel]), e && (e.channelCode || e.streamUrl)) {
       var doResolve = function () {
         var t = ++mn; cn("Cargando señal " + (e.name || "") + "…"), D("resolveLive", e.streamUrl ? { streamUrl: e.streamUrl } : { channelCode: e.channelCode }, function (rErr, rRes) {
@@ -4301,8 +4545,9 @@
       s && (s.style.display = t.uhd ? "block" : "none");
       if (c) {
         c.style.display = "block";
-        if (t.logo) {
-          c.style.backgroundImage = "url(" + t.logo + ")";
+        var tLogo = getChannelLogo(t);
+        if (tLogo) {
+          c.style.backgroundImage = "url(" + tLogo + ")";
           c.style.backgroundSize = "contain";
           c.style.backgroundRepeat = "no-repeat";
           c.style.backgroundPosition = "center";

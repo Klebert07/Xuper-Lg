@@ -17,7 +17,7 @@ if (!fs.existsSync(appinfoPath)) {
 
 const appinfo = JSON.parse(fs.readFileSync(appinfoPath, 'utf8'));
 const appId = appinfo.id || 'com.webosflux.xuptertv.fidelity';
-const appVersion = appinfo.version || '1.0.5';
+const appVersion = appinfo.version || '1.0.6';
 const ipkName = `Xuper WebOS ${appVersion}.ipk`;
 const ipkPath = path.join(WORKSPACE, ipkName);
 

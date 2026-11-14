@@ -447,16 +447,17 @@ function forward(clientReq, clientRes, tokenData, streamToken) {
     }
 
     const isM3u8 = streamMime === "application/vnd.apple.mpegurl";
+    const isLive = !tokenData.duration || tokenData.duration === 0;
     const resHeaders = {
       "Content-Type": streamMime,
       "Accept-Ranges": upRes.headers["accept-ranges"] || "bytes",
       "Access-Control-Allow-Origin": "*",
-      "Cache-Control": isM3u8 ? "no-cache, no-store, must-revalidate" : "private, max-age=120",
+      "Cache-Control": (isM3u8 || isLive) ? "no-cache, no-store, must-revalidate" : "private, max-age=120",
       "Connection": "keep-alive",
       "X-Accel-Buffering": "no"
     };
 
-    if (isM3u8) {
+    if (isM3u8 || isLive) {
       resHeaders["Pragma"] = "no-cache";
       resHeaders["Expires"] = "0";
     }
